@@ -1,0 +1,3 @@
+Rust implemenation of the Tracelogging api from Microsofts Event Tracing for Windows (ETW)
+
+example is in the example folder.
