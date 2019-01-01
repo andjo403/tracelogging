@@ -4,7 +4,7 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use proc_macro_hack::proc_macro_hack;
 use quote::quote;
-use syn::parse::{Error, Parse, ParseStream, Result};
+use syn::parse::{Parse, ParseStream, Result};
 use syn::{parse_macro_input, LitByteStr, LitStr, Token};
 
 struct RegisterStruct {
@@ -77,7 +77,7 @@ impl Parse for RegisterStruct {
 
 /// Add one to an expression.
 #[proc_macro_hack]
-pub fn tracelogging_register(input: TokenStream) -> TokenStream {
+pub fn register(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as RegisterStruct);
     let provider_name = args.provider_name;
     let bytes = provider_name.len() + 1;

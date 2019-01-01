@@ -3,15 +3,12 @@ use std::ffi::CString;
 use std::mem;
 use winapi::{
     shared::{evntprov, winerror},
-    um::{
-        cguid::GUID_NULL,
-        winnt::ULONGLONG,
-    },
+    um::{cguid::GUID_NULL, winnt::ULONGLONG},
 };
 
 /// Add one to an expression.
 #[proc_macro_hack]
-pub use tracelogging_impl::tracelogging_register;
+pub use tracelogging_impl::register;
 
 pub static mut HANDLE: Option<evntprov::REGHANDLE> = None;
 
