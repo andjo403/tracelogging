@@ -1,11 +1,258 @@
 #![recursion_limit = "128"]
 extern crate proc_macro;
 
-use proc_macro::TokenStream;
 use proc_macro_hack::proc_macro_hack;
-use quote::quote;
 use syn::parse::{Parse, ParseStream, Result};
-use syn::{parse_macro_input, LitByteStr, LitStr, Token};
+use syn::punctuated::Punctuated;
+use syn::{
+    parenthesized, parse_macro_input, Expr, ExprPath, Ident, LitByteStr, LitStr, Path, Token,
+};
+
+use proc_macro::TokenStream;
+use proc_macro2::Span;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::quote;
+
+/// Add one to an expression.
+#[proc_macro_hack]
+pub fn register(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as RegisterStruct);
+    let provider_name = args.provider_name;
+    let bytes = provider_name.len() + 1;
+    let guid_part1 = args.guid_part1;
+    let guid_part2 = args.guid_part2;
+    let guid_part3 = args.guid_part3;
+    let guid_part4 = args.guid_part4;
+    TokenStream::from(quote! {
+        {
+            use winapi::{
+                shared::{evntprov, guiddef, winerror},
+                um::{
+                    cguid::GUID_NULL,
+                    winnt::{PVOID, ULONGLONG},
+                },
+            };
+            let mut handle: evntprov::REGHANDLE = 0;
+            let guid = guiddef::GUID {
+                Data1: #guid_part1,
+                Data2: #guid_part2,
+                Data3: #guid_part3,
+                Data4: [#(#guid_part4),*],
+            };
+
+            let mut result =
+                unsafe { evntprov::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
+
+            if result == winerror::ERROR_SUCCESS {
+                #[repr(C, packed)]
+                struct EventInformation {
+                    size: u16,
+                    data: [u8; #bytes],
+                }
+
+                let mut event_info = EventInformation {
+                    size: std::mem::size_of::<EventInformation>() as u16,
+                    data: [#(#provider_name),* , b'\0'],
+                };
+
+                unsafe {
+                    result = evntprov::EventSetInformation(
+                        handle,
+                        evntprov::EventProviderSetTraits,
+                        &event_info as *const _ as PVOID,
+                        std::mem::size_of::<EventInformation>() as u32,
+                    );
+                }
+                if result != winerror::ERROR_SUCCESS {
+                    println!("EventSetInformation failed with '{}'", result);
+                }
+            } else {
+                println!("EventRegister failed with '{}'", result);
+            }
+            unsafe {
+                trace_logging::HANDLE = Some(handle);
+            }
+        }
+    })
+}
+
+/// Add one to an expression.
+#[proc_macro_hack]
+pub fn write(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as WriteInput);
+    let event_meta_data_define = event_meta_data_define(&args);
+    let event_meta_data_init = event_meta_data_init(&args);
+    let fields = args.fields.len() + 1;
+
+    let mut event_data_ref_fields = TokenStream2::new();
+    for (i, field) in args.fields.iter().enumerate() {
+        event_data_ref_fields.extend(event_data_ref_field(i, field));
+    }
+
+    let mut event_data_descriptors_fields = TokenStream2::new();
+    for (i, field) in args.fields.iter().enumerate() {
+        event_data_descriptors_fields.extend(event_data_descriptors_field(i, field));
+    }
+
+    let result = TokenStream::from(quote! {
+        {
+            use winapi::{
+                shared::evntprov,
+                um::winnt::ULONGLONG,
+            };
+
+            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+            let event_descriptor = evntprov::EVENT_DESCRIPTOR {
+                Id: 0,
+                Version: 0,
+                Channel: 0,
+                Level: 0,
+                Opcode: 0,
+                Task: 0,
+                Keyword: 0,
+            };
+
+            #event_meta_data_define
+
+            let event_meta_data = #event_meta_data_init
+
+            #event_data_ref_fields
+
+            let mut event_data_descriptors: [evntprov::EVENT_DATA_DESCRIPTOR; #fields] = [
+                evntprov::EVENT_DATA_DESCRIPTOR {
+                    Ptr: &event_meta_data as *const _ as ULONGLONG,
+                    Size: std::mem::size_of::<EventMetaData>() as u32,
+                    u: unsafe { std::mem::zeroed() },
+                },
+                #event_data_descriptors_fields
+            ];
+
+            unsafe {
+                event_data_descriptors[0].u.s_mut().Type =
+                    evntprov::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
+            }
+
+            unsafe {
+                evntprov::EventWrite(
+                    handle,
+                    &event_descriptor,
+                    #fields as u32,
+                    event_data_descriptors.as_mut_ptr(),
+                )
+            };
+        }}
+    });
+    //println!("{}", result.to_string());
+    result
+}
+
+fn event_meta_data_define(input: &WriteInput) -> TokenStream2 {
+    let event_name_bytes = input.event_name.len() + 1;
+    let mut fields = TokenStream2::new();
+    for (i, field) in input.fields.iter().enumerate() {
+        fields.extend(event_meta_data_field_define(i, field));
+    }
+    quote! {
+        #[repr(C, packed)]
+        struct EventMetaData {
+            meta_size: u16,
+            tags: u8,
+            event_name: [u8; #event_name_bytes],
+            #fields
+        };
+    }
+}
+
+fn event_meta_data_field_define(index: usize, input: &FieldInput) -> TokenStream2 {
+    let name_bytes = input.field_name.len() + 1;
+    let field_name = Ident::new(&format!("field_name_{}", index), Span::call_site());
+    let in_type = Ident::new(&format!("in_type_{}", index), Span::call_site());
+    quote! {
+        #field_name: [u8; #name_bytes],
+        #in_type: trace_logging::FieldType,
+    }
+}
+
+fn event_meta_data_init(input: &WriteInput) -> TokenStream2 {
+    let event_name = &input.event_name;
+    let mut fields = TokenStream2::new();
+    for (i, field) in input.fields.iter().enumerate() {
+        fields.extend(event_meta_data_field_init(i, field));
+    }
+    quote! {
+        EventMetaData {
+            meta_size: std::mem::size_of::<EventMetaData>() as u16,
+            tags: 0,
+            event_name: [#(#event_name),* , b'\0'],
+            #fields
+        };
+    }
+}
+
+fn event_meta_data_field_init(index: usize, input: &FieldInput) -> TokenStream2 {
+    let event_name = &input.field_name;
+    let field_type = &input.field_type;
+    let field_name = Ident::new(&format!("field_name_{}", index), Span::call_site());
+    let in_type = Ident::new(&format!("in_type_{}", index), Span::call_site());
+    quote! {
+        #field_name: [#(#event_name),*  , b'\0'],
+        #in_type: #field_type,
+    }
+}
+
+fn event_data_descriptors_field(index: usize, input: &FieldInput) -> TokenStream2 {
+    let field_name = Ident::new(&format!("field_value_{}", index), Span::call_site());
+    let ExprPath {
+        path: Path { ref segments, .. },
+        ..
+    } = input.field_type;
+    if segments
+        .last()
+        .map(|segment| segment.value().ident.to_string())
+        == Some("ANSISTRING".to_string())
+    {
+        quote! {
+            evntprov::EVENT_DATA_DESCRIPTOR {
+                Ptr: #field_name.as_ptr() as *const _ as ULONGLONG,
+                Size: #field_name.len() as u32,
+                u: unsafe { std::mem::zeroed() },
+            },
+        }
+    } else {
+        quote! {
+            evntprov::EVENT_DATA_DESCRIPTOR {
+                Ptr: &#field_name as *const _ as ULONGLONG,
+                Size: trace_logging::size_of(#field_name),
+                u: unsafe { std::mem::zeroed() },
+            },
+        }
+    }
+}
+
+fn event_data_ref_field(index: usize, input: &FieldInput) -> TokenStream2 {
+    let value = &input.value;
+    let field_name = Ident::new(&format!("field_value_{}", index), Span::call_site());
+    let ExprPath {
+        path: Path { ref segments, .. },
+        ..
+    } = input.field_type;
+    if segments
+        .last()
+        .map(|segment| segment.value().ident.to_string())
+        == Some("ANSISTRING".to_string())
+    {
+        let field_name_store =
+            Ident::new(&format!("field_value_store{}", index), Span::call_site());
+        quote! {
+            let #field_name_store = std::ffi::CString::new(#value).expect("CString::new failed");
+            let #field_name = #field_name_store.as_bytes_with_nul();
+        }
+    } else {
+        quote! {
+            let #field_name = #value;
+        }
+    }
+}
 
 struct RegisterStruct {
     provider_name: Vec<u8>,
@@ -75,65 +322,43 @@ impl Parse for RegisterStruct {
     }
 }
 
-/// Add one to an expression.
-#[proc_macro_hack]
-pub fn register(input: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(input as RegisterStruct);
-    let provider_name = args.provider_name;
-    let bytes = provider_name.len() + 1;
-    let guid_part1 = args.guid_part1;
-    let guid_part2 = args.guid_part2;
-    let guid_part3 = args.guid_part3;
-    let guid_part4 = args.guid_part4;
-    TokenStream::from(quote! {
-        {
-            use winapi::{
-                shared::{evntprov, guiddef, winerror},
-                um::{
-                    cguid::GUID_NULL,
-                    winnt::{PVOID, ULONGLONG},
-                },
-            };
-            let mut handle: evntprov::REGHANDLE = 0;
-            let guid = guiddef::GUID {
-                Data1: #guid_part1,
-                Data2: #guid_part2,
-                Data3: #guid_part3,
-                Data4: [#(#guid_part4),*],
-            };
+struct WriteInput {
+    event_name: Vec<u8>,
+    fields: Vec<FieldInput>,
+}
 
-            let mut result =
-                unsafe { evntprov::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
+struct FieldInput {
+    field_name: Vec<u8>,
+    value: Expr,
+    field_type: ExprPath,
+}
 
-            if result == winerror::ERROR_SUCCESS {
-                #[repr(C, packed)]
-                struct EventInformation {
-                    size: u16,
-                    data: [u8; #bytes],
-                }
+impl Parse for WriteInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let event_name: LitByteStr = input.parse()?;
+        let event_name = event_name.value();
+        input.parse::<Token![,]>()?;
+        let fields: Punctuated<FieldInput, Token![,]> =
+            input.parse_terminated(FieldInput::parse)?;
+        let fields = fields.into_iter().collect();
+        Ok(WriteInput { event_name, fields })
+    }
+}
 
-                let mut event_info = EventInformation {
-                    size: std::mem::size_of::<EventInformation>() as u16,
-                    data: [#(#provider_name),* , b'\0'],
-                };
-
-                unsafe {
-                    result = evntprov::EventSetInformation(
-                        handle,
-                        evntprov::EventProviderSetTraits,
-                        &event_info as *const _ as PVOID,
-                        std::mem::size_of::<EventInformation>() as u32,
-                    );
-                }
-                if result != winerror::ERROR_SUCCESS {
-                    println!("EventSetInformation failed with '{}'", result);
-                }
-            } else {
-                println!("register failed with '{}'", result);
-            }
-            unsafe {
-                trace_logging::HANDLE = Some(handle);
-            }
-        }
-    })
+impl Parse for FieldInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        parenthesized!(content in input);
+        let field_name: LitByteStr = content.parse()?;
+        let field_name = field_name.value();
+        content.parse::<Token![,]>()?;
+        let value: Expr = content.parse()?;
+        content.parse::<Token![,]>()?;
+        let field_type: ExprPath = content.parse()?;
+        Ok(FieldInput {
+            field_name,
+            value,
+            field_type,
+        })
+    }
 }
