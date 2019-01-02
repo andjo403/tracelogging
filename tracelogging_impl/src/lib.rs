@@ -13,7 +13,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-/// Add one to an expression.
 #[proc_macro_hack]
 pub fn register(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as RegisterStruct);
@@ -25,15 +24,8 @@ pub fn register(input: TokenStream) -> TokenStream {
     let guid_part4 = args.guid_part4;
     TokenStream::from(quote! {
         {
-            use winapi::{
-                shared::{evntprov, guiddef, winerror},
-                um::{
-                    cguid::GUID_NULL,
-                    winnt::{PVOID, ULONGLONG},
-                },
-            };
-            let mut handle: evntprov::REGHANDLE = 0;
-            let guid = guiddef::GUID {
+            let mut handle: winapi::shared::evntprov::REGHANDLE = 0;
+            let guid = winapi::shared::guiddef::GUID {
                 Data1: #guid_part1,
                 Data2: #guid_part2,
                 Data3: #guid_part3,
@@ -41,9 +33,9 @@ pub fn register(input: TokenStream) -> TokenStream {
             };
 
             let mut result =
-                unsafe { evntprov::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
+                unsafe { winapi::shared::evntprov::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
 
-            if result == winerror::ERROR_SUCCESS {
+            if result == winapi::shared::winerror::ERROR_SUCCESS {
                 #[repr(C, packed)]
                 struct EventInformation {
                     size: u16,
@@ -56,14 +48,14 @@ pub fn register(input: TokenStream) -> TokenStream {
                 };
 
                 unsafe {
-                    result = evntprov::EventSetInformation(
+                    result = winapi::shared::evntprov::EventSetInformation(
                         handle,
-                        evntprov::EventProviderSetTraits,
-                        &event_info as *const _ as PVOID,
+                        winapi::shared::evntprov::EventProviderSetTraits,
+                        &event_info as *const _ as winapi::um::winnt::PVOID,
                         std::mem::size_of::<EventInformation>() as u32,
                     );
                 }
-                if result != winerror::ERROR_SUCCESS {
+                if result != winapi::shared::winerror::ERROR_SUCCESS {
                     println!("EventSetInformation failed with '{}'", result);
                 }
             } else {
@@ -76,12 +68,174 @@ pub fn register(input: TokenStream) -> TokenStream {
     })
 }
 
-/// Add one to an expression.
 #[proc_macro_hack]
 pub fn write(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as WriteInput);
-    let event_meta_data_define = event_meta_data_define(&args);
-    let event_meta_data_init = event_meta_data_init(&args);
+    let fields = args.fields.len() + 1;
+    let event_meta_data = event_meta_data(&args);
+    let result = TokenStream::from(quote! {
+        {
+            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+                #event_meta_data
+
+                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                    Id: 0,
+                    Version: 0,
+                    Channel: 0,
+                    Level: 0,
+                    Opcode: 0,
+                    Task: 0,
+                    Keyword: 0,
+                };
+
+                unsafe {
+                    winapi::shared::evntprov::EventWrite(
+                        handle,
+                        &event_descriptor,
+                        #fields as u32,
+                        event_data_descriptors.as_mut_ptr(),
+                    )
+                };
+            }
+        }
+    });
+    //println!("{}", result.to_string());
+    result
+}
+
+#[proc_macro_hack]
+pub fn write_start(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as WriteInput);
+    let fields = args.fields.len() + 1;
+    let event_meta_data = event_meta_data(&args);
+    let result = TokenStream::from(quote! {
+        {
+            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+                #event_meta_data
+
+                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                    Id: 0,
+                    Version: 0,
+                    Channel: 0,
+                    Level: 0,
+                    Opcode: 1, // start
+                    Task: 0,
+                    Keyword: 0,
+                };
+
+                trace_logging::GUID_STACK.with(|s| {
+                    let mut stack = s.borrow_mut();
+                    let mut current = winapi::um::cguid::GUID_NULL;
+                    unsafe {
+                        winapi::shared::evntprov::EventActivityIdControl(winapi::shared::evntprov::EVENT_ACTIVITY_CTRL_CREATE_ID,&mut current);
+                    }
+                    stack.push(current);
+
+                    unsafe {
+                        winapi::shared::evntprov::EventWriteTransfer(
+                            handle,
+                            &event_descriptor,
+                            &current,
+                            std::ptr::null(),
+                            #fields as u32,
+                            event_data_descriptors.as_mut_ptr(),
+                        )
+                    };
+                });
+            }
+        }
+    });
+    //println!("{}", result.to_string());
+    result
+}
+
+#[proc_macro_hack]
+pub fn write_stop(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as WriteInput);
+    let fields = args.fields.len() + 1;
+    let event_meta_data = event_meta_data(&args);
+    let result = TokenStream::from(quote! {
+        {
+            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+                #event_meta_data
+
+                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                    Id: 0,
+                    Version: 0,
+                    Channel: 0,
+                    Level: 0,
+                    Opcode: 2, // stop
+                    Task: 0,
+                    Keyword: 0,
+                };
+
+                trace_logging::GUID_STACK.with(|s| {
+                    let mut stack = s.borrow_mut();
+                    let current = stack.pop().expect("write_start needs to done before write_stop");
+
+                    unsafe {
+                        winapi::shared::evntprov::EventWriteTransfer(
+                            handle,
+                            &event_descriptor,
+                            &current,
+                            std::ptr::null(),
+                            #fields as u32,
+                            event_data_descriptors.as_mut_ptr(),
+                        )
+                    };
+                });
+            }
+        }
+    });
+    //println!("{}", result.to_string());
+    result
+}
+
+#[proc_macro_hack]
+pub fn write_tagged(input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(input as WriteInput);
+    let fields = args.fields.len() + 1;
+    let event_meta_data = event_meta_data(&args);
+    let result = TokenStream::from(quote! {
+        {
+            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+                #event_meta_data
+
+                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                    Id: 0,
+                    Version: 0,
+                    Channel: 0,
+                    Level: 0,
+                    Opcode: 0,
+                    Task: 0,
+                    Keyword: 0,
+                };
+
+                trace_logging::GUID_STACK.with(|s| {
+                    let stack = s.borrow();
+                    let current = stack.last().expect("write_start needs to done before write_stop");
+
+                    unsafe {
+                        winapi::shared::evntprov::EventWriteTransfer(
+                            handle,
+                            &event_descriptor,
+                            current,
+                            std::ptr::null(),
+                            #fields as u32,
+                            event_data_descriptors.as_mut_ptr(),
+                        )
+                    };
+                });
+            }
+        }
+    });
+    //println!("{}", result.to_string());
+    result
+}
+
+fn event_meta_data(args: &WriteInput) -> TokenStream2 {
+    let event_meta_data_define = event_meta_data_define(args);
+    let event_meta_data_init = event_meta_data_init(args);
     let fields = args.fields.len() + 1;
 
     let mut event_data_ref_fields = TokenStream2::new();
@@ -94,56 +248,27 @@ pub fn write(input: TokenStream) -> TokenStream {
         event_data_descriptors_fields.extend(event_data_descriptors_field(i, field));
     }
 
-    let result = TokenStream::from(quote! {
-        {
-            use winapi::{
-                shared::evntprov,
-                um::winnt::ULONGLONG,
-            };
+    quote! {
+        #event_meta_data_define
 
-            if let Some(handle) = unsafe { trace_logging::HANDLE } {
-            let event_descriptor = evntprov::EVENT_DESCRIPTOR {
-                Id: 0,
-                Version: 0,
-                Channel: 0,
-                Level: 0,
-                Opcode: 0,
-                Task: 0,
-                Keyword: 0,
-            };
+        let event_meta_data = #event_meta_data_init
 
-            #event_meta_data_define
+        #event_data_ref_fields
 
-            let event_meta_data = #event_meta_data_init
+        let mut event_data_descriptors: [winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR; #fields] = [
+            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
+                Ptr: &event_meta_data as *const _ as winapi::um::winnt::ULONGLONG,
+                Size: std::mem::size_of::<EventMetaData>() as u32,
+                u: unsafe { std::mem::zeroed() },
+            },
+            #event_data_descriptors_fields
+        ];
 
-            #event_data_ref_fields
-
-            let mut event_data_descriptors: [evntprov::EVENT_DATA_DESCRIPTOR; #fields] = [
-                evntprov::EVENT_DATA_DESCRIPTOR {
-                    Ptr: &event_meta_data as *const _ as ULONGLONG,
-                    Size: std::mem::size_of::<EventMetaData>() as u32,
-                    u: unsafe { std::mem::zeroed() },
-                },
-                #event_data_descriptors_fields
-            ];
-
-            unsafe {
-                event_data_descriptors[0].u.s_mut().Type =
-                    evntprov::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
-            }
-
-            unsafe {
-                evntprov::EventWrite(
-                    handle,
-                    &event_descriptor,
-                    #fields as u32,
-                    event_data_descriptors.as_mut_ptr(),
-                )
-            };
-        }}
-    });
-    //println!("{}", result.to_string());
-    result
+        unsafe {
+            event_data_descriptors[0].u.s_mut().Type =
+                winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
+        }
+    }
 }
 
 fn event_meta_data_define(input: &WriteInput) -> TokenStream2 {
@@ -212,17 +337,17 @@ fn event_data_descriptors_field(index: usize, input: &FieldInput) -> TokenStream
         == Some("ANSISTRING".to_string())
     {
         quote! {
-            evntprov::EVENT_DATA_DESCRIPTOR {
-                Ptr: #field_name.as_ptr() as *const _ as ULONGLONG,
+            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
+                Ptr: #field_name.as_ptr() as *const _ as winapi::um::winnt::ULONGLONG,
                 Size: #field_name.len() as u32,
                 u: unsafe { std::mem::zeroed() },
             },
         }
     } else {
         quote! {
-            evntprov::EVENT_DATA_DESCRIPTOR {
-                Ptr: &#field_name as *const _ as ULONGLONG,
-                Size: trace_logging::size_of(#field_name),
+            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
+                Ptr: &#field_name as *const _ as winapi::um::winnt::ULONGLONG,
+                Size: trace_logging::size_of(&#field_name),
                 u: unsafe { std::mem::zeroed() },
             },
         }
