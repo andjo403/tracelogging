@@ -24,8 +24,8 @@ pub fn register(input: TokenStream) -> TokenStream {
     let guid_part4 = args.guid_part4;
     TokenStream::from(quote! {
         {
-            let mut handle: winapi::shared::evntprov::REGHANDLE = 0;
-            let guid = winapi::shared::guiddef::GUID {
+            let mut handle: tracelogging::internal::REGHANDLE = 0;
+            let guid = tracelogging::internal::GUID {
                 Data1: #guid_part1,
                 Data2: #guid_part2,
                 Data3: #guid_part3,
@@ -33,9 +33,9 @@ pub fn register(input: TokenStream) -> TokenStream {
             };
 
             let mut result =
-                unsafe { winapi::shared::evntprov::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
+                unsafe { tracelogging::internal::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle) };
 
-            if result == winapi::shared::winerror::ERROR_SUCCESS {
+            if result == tracelogging::internal::ERROR_SUCCESS {
                 #[repr(C, packed)]
                 struct EventInformation {
                     size: u16,
@@ -48,21 +48,21 @@ pub fn register(input: TokenStream) -> TokenStream {
                 };
 
                 unsafe {
-                    result = winapi::shared::evntprov::EventSetInformation(
+                    result = tracelogging::internal::EventSetInformation(
                         handle,
-                        winapi::shared::evntprov::EventProviderSetTraits,
-                        &event_info as *const _ as winapi::um::winnt::PVOID,
+                        tracelogging::internal::EventProviderSetTraits,
+                        &event_info as *const _ as tracelogging::internal::PVOID,
                         std::mem::size_of::<EventInformation>() as u32,
                     );
                 }
-                if result != winapi::shared::winerror::ERROR_SUCCESS {
+                if result != tracelogging::internal::ERROR_SUCCESS {
                     println!("EventSetInformation failed with '{}'", result);
                 }
             } else {
                 println!("EventRegister failed with '{}'", result);
             }
             unsafe {
-                trace_logging::HANDLE = Some(handle);
+                tracelogging::internal::HANDLE = Some(handle);
             }
         }
     })
@@ -75,10 +75,10 @@ pub fn write(input: TokenStream) -> TokenStream {
     let event_meta_data = event_meta_data(&args);
     let result = TokenStream::from(quote! {
         {
-            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+            if let Some(handle) = unsafe { tracelogging::internal::HANDLE } {
                 #event_meta_data
 
-                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                let event_descriptor = tracelogging::internal::EVENT_DESCRIPTOR {
                     Id: 0,
                     Version: 0,
                     Channel: 0,
@@ -89,7 +89,7 @@ pub fn write(input: TokenStream) -> TokenStream {
                 };
 
                 unsafe {
-                    winapi::shared::evntprov::EventWrite(
+                    tracelogging::internal::EventWrite(
                         handle,
                         &event_descriptor,
                         #fields as u32,
@@ -110,10 +110,10 @@ pub fn write_start(input: TokenStream) -> TokenStream {
     let event_meta_data = event_meta_data(&args);
     let result = TokenStream::from(quote! {
         {
-            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+            if let Some(handle) = unsafe { tracelogging::internal::HANDLE } {
                 #event_meta_data
 
-                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                let event_descriptor = tracelogging::internal::EVENT_DESCRIPTOR {
                     Id: 0,
                     Version: 0,
                     Channel: 0,
@@ -123,16 +123,16 @@ pub fn write_start(input: TokenStream) -> TokenStream {
                     Keyword: 0,
                 };
 
-                trace_logging::GUID_STACK.with(|s| {
+                tracelogging::internal::GUID_STACK.with(|s| {
                     let mut stack = s.borrow_mut();
-                    let mut current = winapi::um::cguid::GUID_NULL;
+                    let mut current = unsafe {std::mem::uninitialized::<tracelogging::internal::GUID>()};
                     unsafe {
-                        winapi::shared::evntprov::EventActivityIdControl(winapi::shared::evntprov::EVENT_ACTIVITY_CTRL_CREATE_ID,&mut current);
+                        tracelogging::internal::EventActivityIdControl(tracelogging::internal::EVENT_ACTIVITY_CTRL_CREATE_ID,&mut current);
                     }
                     stack.push(current);
 
                     unsafe {
-                        winapi::shared::evntprov::EventWriteTransfer(
+                        tracelogging::internal::EventWriteTransfer(
                             handle,
                             &event_descriptor,
                             &current,
@@ -156,10 +156,10 @@ pub fn write_stop(input: TokenStream) -> TokenStream {
     let event_meta_data = event_meta_data(&args);
     let result = TokenStream::from(quote! {
         {
-            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+            if let Some(handle) = unsafe { tracelogging::internal::HANDLE } {
                 #event_meta_data
 
-                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                let event_descriptor = tracelogging::internal::EVENT_DESCRIPTOR {
                     Id: 0,
                     Version: 0,
                     Channel: 0,
@@ -169,12 +169,12 @@ pub fn write_stop(input: TokenStream) -> TokenStream {
                     Keyword: 0,
                 };
 
-                trace_logging::GUID_STACK.with(|s| {
+                tracelogging::internal::GUID_STACK.with(|s| {
                     let mut stack = s.borrow_mut();
                     let current = stack.pop().expect("write_start needs to done before write_stop");
 
                     unsafe {
-                        winapi::shared::evntprov::EventWriteTransfer(
+                        tracelogging::internal::EventWriteTransfer(
                             handle,
                             &event_descriptor,
                             &current,
@@ -198,10 +198,10 @@ pub fn write_tagged(input: TokenStream) -> TokenStream {
     let event_meta_data = event_meta_data(&args);
     let result = TokenStream::from(quote! {
         {
-            if let Some(handle) = unsafe { trace_logging::HANDLE } {
+            if let Some(handle) = unsafe { tracelogging::internal::HANDLE } {
                 #event_meta_data
 
-                let event_descriptor = winapi::shared::evntprov::EVENT_DESCRIPTOR {
+                let event_descriptor = tracelogging::internal::EVENT_DESCRIPTOR {
                     Id: 0,
                     Version: 0,
                     Channel: 0,
@@ -211,12 +211,12 @@ pub fn write_tagged(input: TokenStream) -> TokenStream {
                     Keyword: 0,
                 };
 
-                trace_logging::GUID_STACK.with(|s| {
+                tracelogging::internal::GUID_STACK.with(|s| {
                     let stack = s.borrow();
                     let current = stack.last().expect("write_start needs to done before write_stop");
 
                     unsafe {
-                        winapi::shared::evntprov::EventWriteTransfer(
+                        tracelogging::internal::EventWriteTransfer(
                             handle,
                             &event_descriptor,
                             current,
@@ -255,9 +255,9 @@ fn event_meta_data(args: &WriteInput) -> TokenStream2 {
 
         #event_data_ref_fields
 
-        let mut event_data_descriptors: [winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR; #fields] = [
-            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
-                Ptr: &event_meta_data as *const _ as winapi::um::winnt::ULONGLONG,
+        let mut event_data_descriptors: [tracelogging::internal::EVENT_DATA_DESCRIPTOR; #fields] = [
+            tracelogging::internal::EVENT_DATA_DESCRIPTOR {
+                Ptr: &event_meta_data as *const _ as tracelogging::internal::ULONGLONG,
                 Size: std::mem::size_of::<EventMetaData>() as u32,
                 u: unsafe { std::mem::zeroed() },
             },
@@ -266,7 +266,7 @@ fn event_meta_data(args: &WriteInput) -> TokenStream2 {
 
         unsafe {
             event_data_descriptors[0].u.s_mut().Type =
-                winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
+                tracelogging::internal::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
         }
     }
 }
@@ -294,7 +294,7 @@ fn event_meta_data_field_define(index: usize, input: &FieldInput) -> TokenStream
     let in_type = Ident::new(&format!("in_type_{}", index), Span::call_site());
     quote! {
         #field_name: [u8; #name_bytes],
-        #in_type: trace_logging::FieldType,
+        #in_type: tracelogging::FieldType,
     }
 }
 
@@ -337,17 +337,17 @@ fn event_data_descriptors_field(index: usize, input: &FieldInput) -> TokenStream
         == Some("ANSISTRING".to_string())
     {
         quote! {
-            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
-                Ptr: #field_name.as_ptr() as *const _ as winapi::um::winnt::ULONGLONG,
+            tracelogging::internal::EVENT_DATA_DESCRIPTOR {
+                Ptr: #field_name.as_ptr() as *const _ as tracelogging::internal::ULONGLONG,
                 Size: #field_name.len() as u32,
                 u: unsafe { std::mem::zeroed() },
             },
         }
     } else {
         quote! {
-            winapi::shared::evntprov::EVENT_DATA_DESCRIPTOR {
-                Ptr: &#field_name as *const _ as winapi::um::winnt::ULONGLONG,
-                Size: trace_logging::size_of(&#field_name),
+            tracelogging::internal::EVENT_DATA_DESCRIPTOR {
+                Ptr: &#field_name as *const _ as tracelogging::internal::ULONGLONG,
+                Size: tracelogging::internal::size_of(&#field_name),
                 u: unsafe { std::mem::zeroed() },
             },
         }

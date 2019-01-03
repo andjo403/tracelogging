@@ -5,7 +5,4 @@ authors = ["Andreas Jonson <andjo403@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-trace_logging = { path = "../trace_logging" }
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["evntprov","minwindef","winerror","winnt","cguid"] }
+tracelogging = { path = "../tracelogging" }

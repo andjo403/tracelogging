@@ -1,53 +1,51 @@
-use trace_logging;
-
 fn main() {
-    trace_logging::register!(
+    tracelogging::register!(
         b"SimpleTraceLoggingProvider",
         "3970F9cf-2c0c-4f11-b1cc-e3a1e9958833"
     );
     for _ in 0..4 {
-        trace_logging::write_start!(
+        tracelogging::write_start!(
             b"first",
-            (b"the answer", 41 + 1, trace_logging::FieldType::U32),
+            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
         );
 
         let second = "second";
-        trace_logging::write!(
+        tracelogging::write!(
             b"myEvent",
-            (b"the answer", 41 + 1, trace_logging::FieldType::U32),
+            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
             (
                 b"the smaller answer",
                 42 as u8,
-                trace_logging::FieldType::U8
+                tracelogging::FieldType::U8
             ),
             (
                 b"msg",
                 "this is the first log message",
-                trace_logging::FieldType::ANSISTRING
+                tracelogging::FieldType::ANSISTRING
             ),
-            (b"msg2", second, trace_logging::FieldType::ANSISTRING),
+            (b"msg2", second, tracelogging::FieldType::ANSISTRING),
         );
 
-        trace_logging::write_tagged!(
+        tracelogging::write_tagged!(
             b"myEvent",
-            (b"the answer", 41 + 1, trace_logging::FieldType::U32),
+            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
             (
                 b"the smaller answer",
                 42 as u8,
-                trace_logging::FieldType::U8
+                tracelogging::FieldType::U8
             ),
             (
                 b"msg",
                 "this is the first log message",
-                trace_logging::FieldType::ANSISTRING
+                tracelogging::FieldType::ANSISTRING
             ),
-            (b"msg2", second, trace_logging::FieldType::ANSISTRING),
+            (b"msg2", second, tracelogging::FieldType::ANSISTRING),
         );
 
-        trace_logging::write_stop!(
+        tracelogging::write_stop!(
             b"first",
-            (b"the answer", 41 + 1, trace_logging::FieldType::U32),
+            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
         );
     }
-    trace_logging::un_register();
+    tracelogging::un_register();
 }

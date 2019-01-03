@@ -2,8 +2,7 @@
 name = "example"
 version = "0.1.0"
 dependencies = [
- "trace_logging 0.1.0",
- "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracelogging 0.1.0",
 ]
 
 [[package]]
@@ -43,16 +42,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "trace_logging"
+name = "tracelogging"
 version = "0.1.0"
 dependencies = [
  "proc-macro-hack 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "tracelogging_impl 0.1.0",
+ "tracelogging-impl 0.1.0",
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
-name = "tracelogging_impl"
+name = "tracelogging-impl"
 version = "0.1.0"
 dependencies = [
  "proc-macro-hack 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
