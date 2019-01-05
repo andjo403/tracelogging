@@ -15,7 +15,7 @@ fn main() {
             (b"the answer", 41 + 1, tracelogging::FieldType::U32),
             (
                 b"the smaller answer",
-                42 as u8,
+                42u8,
                 tracelogging::FieldType::U8
             ),
             (
@@ -31,7 +31,7 @@ fn main() {
             (b"the answer", 41 + 1, tracelogging::FieldType::U32),
             (
                 b"the smaller answer",
-                42 as u8,
+                42u8,
                 tracelogging::FieldType::U8
             ),
             (

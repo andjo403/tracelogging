@@ -37,13 +37,13 @@ pub fn register(input: TokenStream) -> TokenStream {
 
             if result == tracelogging::internal::ERROR_SUCCESS {
                 #[repr(C, packed)]
-                struct EventInformation {
+                struct ProviderMetaData {
                     size: u16,
                     data: [u8; #bytes],
                 }
 
-                let mut event_info = EventInformation {
-                    size: std::mem::size_of::<EventInformation>() as u16,
+                let mut event_info = ProviderMetaData {
+                    size: std::mem::size_of::<ProviderMetaData>() as u16,
                     data: [#(#provider_name),* , b'\0'],
                 };
 
@@ -52,7 +52,7 @@ pub fn register(input: TokenStream) -> TokenStream {
                         handle,
                         tracelogging::internal::EventProviderSetTraits,
                         &event_info as *const _ as tracelogging::internal::PVOID,
-                        std::mem::size_of::<EventInformation>() as u32,
+                        std::mem::size_of::<ProviderMetaData>() as u32,
                     );
                 }
                 if result != tracelogging::internal::ERROR_SUCCESS {
@@ -259,15 +259,10 @@ fn event_meta_data(args: &WriteInput) -> TokenStream2 {
             tracelogging::internal::EVENT_DATA_DESCRIPTOR {
                 Ptr: &event_meta_data as *const _ as tracelogging::internal::ULONGLONG,
                 Size: std::mem::size_of::<EventMetaData>() as u32,
-                u: unsafe { std::mem::zeroed() },
+                u: unsafe { std::mem::transmute(1u32) },
             },
             #event_data_descriptors_fields
         ];
-
-        unsafe {
-            event_data_descriptors[0].u.s_mut().Type =
-                tracelogging::internal::EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA;
-        }
     }
 }
 
