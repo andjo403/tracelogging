@@ -171,7 +171,7 @@ macro_rules! replace_expr {
 
 #[macro_export]
 macro_rules! event_meta_data_macro {
-        ( $opcode:tt $funk:ident $event: expr $(,)? $($vars:ident),* ) => {
+        ( $opcode:tt $funk:ident $event:expr $(,)? $($vars:ident),* $(,)? ) => {
             if let Some(handle) = unsafe { $crate::internal::HANDLE } {
                 #[repr(C, packed)]
                 struct EventMetaData {
@@ -382,10 +382,10 @@ macro_rules! write_tagged {
 
 #[macro_export]
 macro_rules! write_expr {
-    ( $exp:expr , $($arg:tt)* ) => {
-        $crate::write_start!($($arg)*);
+    ( $name:expr , $exp:expr , $($arg:tt)* ) => {
+        $crate::write_start!($name $($arg)*);
         let result = $exp;
-        $crate::write_stop!($($arg)*);
+        $crate::write_stop!($name $($arg)*);
         result
     };
 }
