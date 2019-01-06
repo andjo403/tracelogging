@@ -14,26 +14,25 @@ fn main() {
         Data4: [0xb1, 0xcc, 0xe3, 0xa1, 0xe9, 0x95, 0x88, 0x33],
     }; //3970f9cf-2c0c-4f11-b1cc-e3a1e9958833
 
-    tracelogging::register!(guid, SimpleTraceLoggingProvider);
+    register!(guid, SimpleTraceLoggingProvider);
     let var1 = 42;
     let var2 = "first";
-    tracelogging::write!("myEvent1", var1, var2);
-    tracelogging::write!("myEvent2");
+    write!("myEvent1", var1, var2);
+    write!("myEvent2");
 
-    tracelogging::write_start!("myEvent3", var1, var2);
-    tracelogging::write_stop!("myEvent3", var1, var2);
+    write_start!("myEvent3", var1, var2);
+    write_stop!("myEvent3", var1, var2);
 
-    tracelogging::write_expr!(
+    write_expr!(
         "myEvent4",
-        tracelogging::write_tagged!("myEvent5", var1, var2),
+        || {write_tagged!("myEvent5", var1, var2);},
         var1,
         var2
     );
 
-    tracelogging::write_expr!(
-        "myEvent6",
-        tracelogging::write_tagged!("myEvent7", var1, var2),
-    );
+    write_expr!("myEvent6", || {
+        write_tagged!("myEvent7", var1, var2);
+    },);
 
     tracelogging::un_register();
 }
