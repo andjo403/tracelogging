@@ -3,5 +3,4 @@
 members = [
     "example",
     "tracelogging",
-    "tracelogging-impl",
 ]

@@ -1,51 +1,26 @@
+#![feature(const_str_as_bytes)]
+#![feature(const_slice_len)]
+#![feature(const_str_len)]
+#![feature(const_raw_ptr_deref)]
+
+#[macro_use]
+extern crate tracelogging;
+
 fn main() {
-    tracelogging::register!(
-        b"SimpleTraceLoggingProvider",
-        "3970F9cf-2c0c-4f11-b1cc-e3a1e9958833"
-    );
-    for _ in 0..4 {
-        tracelogging::write_start!(
-            b"first",
-            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
-        );
+    let guid = tracelogging::internal::GUID {
+        Data1: 0x3970_f9cf,
+        Data2: 0x2c0c,
+        Data3: 0x4f11,
+        Data4: [0xb1, 0xcc, 0xe3, 0xa1, 0xe9, 0x95, 0x88, 0x33],
+    }; //3970f9cf-2c0c-4f11-b1cc-e3a1e9958833
 
-        let second = "second";
-        tracelogging::write!(
-            b"myEvent",
-            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
-            (
-                b"the smaller answer",
-                42u8,
-                tracelogging::FieldType::U8
-            ),
-            (
-                b"msg",
-                "this is the first log message",
-                tracelogging::FieldType::ANSISTRING
-            ),
-            (b"msg2", second, tracelogging::FieldType::ANSISTRING),
-        );
+    tracelogging::register!(guid, SimpleTraceLoggingProvider);
+    let var1 = 42;
+    let var2 = "first";
+    tracelogging::write!(myEvent, var1, var2);
 
-        tracelogging::write_tagged!(
-            b"myEvent",
-            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
-            (
-                b"the smaller answer",
-                42u8,
-                tracelogging::FieldType::U8
-            ),
-            (
-                b"msg",
-                "this is the first log message",
-                tracelogging::FieldType::ANSISTRING
-            ),
-            (b"msg2", second, tracelogging::FieldType::ANSISTRING),
-        );
+    tracelogging::write_start!(myEvent, var1, var2);
+    tracelogging::write_stop!(myEvent, var1, var2);
 
-        tracelogging::write_stop!(
-            b"first",
-            (b"the answer", 41 + 1, tracelogging::FieldType::U32),
-        );
-    }
     tracelogging::un_register();
 }
