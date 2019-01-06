@@ -143,18 +143,21 @@ macro_rules! c_string {
     ($id:ident) => {
         concat!(stringify!($id), '\0')
     };
+    ($id:expr) => {
+        concat!($id, '\0')
+    };
 }
 
 #[macro_export]
 macro_rules! array_type {
-    ($id:ident) => {
+    ($id:tt) => {
         [u8; $crate::c_string!($id).len()]
     };
 }
 
 #[macro_export]
 macro_rules! array_init {
-    ($id:ident) => {
+    ($id:tt) => {
         unsafe { *($crate::c_string!($id).as_bytes() as *const _ as *const array_type!($id)) }
     };
 }
@@ -168,7 +171,7 @@ macro_rules! replace_expr {
 
 #[macro_export]
 macro_rules! event_meta_data_macro {
-        ( $opcode:tt $funk:ident $event:ident $(,)? $($vars:ident),* ) => {
+        ( $opcode:tt $funk:ident $event: expr $(,)? $($vars:ident),* ) => {
             if let Some(handle) = unsafe { $crate::internal::HANDLE } {
                 #[repr(C, packed)]
                 struct EventMetaData {

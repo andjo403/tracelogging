@@ -17,10 +17,10 @@ fn main() {
     tracelogging::register!(guid, SimpleTraceLoggingProvider);
     let var1 = 42;
     let var2 = "first";
-    tracelogging::write!(myEvent, var1, var2);
+    tracelogging::write!("myEvent", var1, var2);
 
-    tracelogging::write_start!(myEvent, var1, var2);
-    tracelogging::write_stop!(myEvent, var1, var2);
+    tracelogging::write_start!("myEvent", var1, var2);
+    tracelogging::write_stop!("myEvent", var1, var2);
 
     tracelogging::un_register();
 }
