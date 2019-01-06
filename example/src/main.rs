@@ -25,14 +25,16 @@ fn main() {
 
     write_expr!(
         "myEvent4",
-        || {write_tagged!("myEvent5", var1, var2);},
+        || {
+            write_tagged!("myEvent5", var1, var2);
+        },
         var1,
         var2
     );
 
     write_expr!("myEvent6", || {
         write_tagged!("myEvent7", var1, var2);
-    },);
+    });
 
     tracelogging::un_register();
 }

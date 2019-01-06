@@ -382,10 +382,10 @@ macro_rules! write_tagged {
 
 #[macro_export]
 macro_rules! write_expr {
-    ( $name:expr , $exp:expr , $($arg:tt)* ) => {
-        $crate::write_start!($name $($arg)*);
+    ( $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
+        $crate::write_start!($name $($arg),*);
         let result = $exp();
-        $crate::write_stop!($name $($arg)*);
+        $crate::write_stop!($name $($arg),*);
         result
     };
 }
