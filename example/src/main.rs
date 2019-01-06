@@ -32,9 +32,21 @@ fn main() {
         var2
     );
 
-    write_expr!("myEvent6", || {
-        write_tagged!("myEvent7", var1, var2);
-    });
+    assert_eq!(
+        3,
+        write_expr!("myEvent6", {
+            write_tagged!("myEvent7", var1, var2);
+            2 + 1
+        })
+    );
+
+    assert_eq!(
+        3,
+        write_fun!("myEvent6", || {
+            write_tagged!("myEvent7", var1, var2);
+            2 + 1
+        })
+    );
 
     tracelogging::un_register();
 }
