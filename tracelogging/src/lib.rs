@@ -224,7 +224,7 @@ macro_rules! event_meta_data_macro {
     }
 
 #[macro_export]
-macro_rules! event_write_start {
+macro_rules! event_tracelogging_start {
     ($handle:ident $event_descriptor:ident $event_data_descriptors:ident) => {
         $crate::internal::GUID_STACK.with(|s| {
             let mut stack = s.borrow_mut();
@@ -252,7 +252,7 @@ macro_rules! event_write_start {
 }
 
 #[macro_export]
-macro_rules! event_write {
+macro_rules! event_tracelogging {
     ($handle:ident $event_descriptor:ident $event_data_descriptors:ident) => {
         unsafe {
             $crate::internal::EventWrite(
@@ -266,13 +266,13 @@ macro_rules! event_write {
 }
 
 #[macro_export]
-macro_rules! event_write_stop {
+macro_rules! event_tracelogging_stop {
     ($handle:ident $event_descriptor:ident $event_data_descriptors:ident) => {
         $crate::internal::GUID_STACK.with(|s| {
             let mut stack = s.borrow_mut();
             let current = stack
                 .pop()
-                .expect("write_start needs to done before write_stop");
+                .expect("tracelogging_start needs to done before tracelogging_stop");
 
             unsafe {
                 $crate::internal::EventWriteTransfer(
@@ -289,13 +289,13 @@ macro_rules! event_write_stop {
 }
 
 #[macro_export]
-macro_rules! event_write_tagged {
+macro_rules! event_tracelogging_tagged {
     ($handle:ident $event_descriptor:ident $event_data_descriptors:ident) => {
         tracelogging::internal::GUID_STACK.with(|s| {
             let stack = s.borrow();
             let current = stack
                 .last()
-                .expect("write_start needs to done before write_stop");
+                .expect("tracelogging_start needs to done before tracelogging_stop");
 
             unsafe {
                 tracelogging::internal::EventWriteTransfer(
@@ -312,7 +312,7 @@ macro_rules! event_write_tagged {
 }
 
 #[macro_export]
-macro_rules! register {
+macro_rules! tracelogging_register {
     ( $guid:ident , $provider_name:ident ) => {
         let mut handle: $crate::internal::REGHANDLE = 0;
 
@@ -353,52 +353,52 @@ macro_rules! register {
 }
 
 #[macro_export]
-macro_rules! write {
+macro_rules! tracelogging {
     ( $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!(0 event_write $($arg)*)
+        $crate::event_meta_data_macro!(0 event_tracelogging $($arg)*)
     };
 }
 
 #[macro_export]
-macro_rules! write_start {
+macro_rules! tracelogging_start {
     ( $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!(1 event_write_start $($arg)*)
+        $crate::event_meta_data_macro!(1 event_tracelogging_start $($arg)*)
     };
 }
 
 #[macro_export]
-macro_rules! write_stop {
+macro_rules! tracelogging_stop {
     ( $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!(2 event_write_stop $($arg)*)
+        $crate::event_meta_data_macro!(2 event_tracelogging_stop $($arg)*)
     };
 }
 
 #[macro_export]
-macro_rules! write_tagged {
+macro_rules! tracelogging_tagged {
     ( $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!(0 event_write_tagged $($arg)*)
+        $crate::event_meta_data_macro!(0 event_tracelogging_tagged $($arg)*)
     };
 }
 
 #[macro_export]
-macro_rules! write_expr {
+macro_rules! tracelogging_expr {
     ( $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
         {
-            $crate::write_start!($name $($arg),*);
+            $crate::tracelogging_start!($name $($arg),*);
             let result = $exp;
-            $crate::write_stop!($name $($arg),*);
+            $crate::tracelogging_stop!($name $($arg),*);
             result
         }
     };
 }
 
 #[macro_export]
-macro_rules! write_fun {
+macro_rules! tracelogging_fun {
     ( $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
         {
-            $crate::write_start!($name $($arg),*);
+            $crate::tracelogging_start!($name $($arg),*);
             let result = $exp();
-            $crate::write_stop!($name $($arg),*);
+            $crate::tracelogging_stop!($name $($arg),*);
             result
         }
     };

@@ -14,19 +14,19 @@ fn main() {
         Data4: [0xb1, 0xcc, 0xe3, 0xa1, 0xe9, 0x95, 0x88, 0x33],
     }; //3970f9cf-2c0c-4f11-b1cc-e3a1e9958833
 
-    register!(guid, SimpleTraceLoggingProvider);
+    tracelogging_register!(guid, SimpleTraceLoggingProvider);
     let var1 = 42;
     let var2 = "first";
-    write!("myEvent1", var1, var2);
-    write!("myEvent2");
+    tracelogging!("myEvent1", var1, var2);
+    tracelogging!("myEvent2");
 
-    write_start!("myEvent3", var1, var2);
-    write_stop!("myEvent3", var1, var2);
+    tracelogging_start!("myEvent3", var1, var2);
+    tracelogging_stop!("myEvent3", var1, var2);
 
-    write_expr!(
+    tracelogging_expr!(
         "myEvent4",
         || {
-            write_tagged!("myEvent5", var1, var2);
+            tracelogging_tagged!("myEvent5", var1, var2);
         },
         var1,
         var2
@@ -34,16 +34,16 @@ fn main() {
 
     assert_eq!(
         3,
-        write_expr!("myEvent6", {
-            write_tagged!("myEvent7", var1, var2);
+        tracelogging_expr!("myEvent6", {
+            tracelogging_tagged!("myEvent7", var1, var2);
             2 + 1
         })
     );
 
     assert_eq!(
         3,
-        write_fun!("myEvent6", || {
-            write_tagged!("myEvent7", var1, var2);
+        tracelogging_fun!("myEvent6", || {
+            tracelogging_tagged!("myEvent7", var1, var2);
             2 + 1
         })
     );
