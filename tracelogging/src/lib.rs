@@ -88,6 +88,16 @@ pub mod internal {
         }
     }
 
+    impl From<String> for FieldType {
+        fn from(value: String) -> Self {
+            let cstr = CString::new(value)
+                .expect("CString::new failed")
+                .into_bytes_with_nul();
+
+            FieldType::ANSISTRING(cstr)
+        }
+    }
+
     impl FieldType {
         pub fn size_of(&self) -> u32 {
             let size = match self {
