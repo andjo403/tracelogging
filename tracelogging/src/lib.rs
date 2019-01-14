@@ -98,6 +98,14 @@ pub mod internal {
         }
     }
 
+    impl From<CString> for FieldType {
+        fn from(value: CString) -> Self {
+            let cstr = value.into_bytes_with_nul();
+
+            FieldType::ANSISTRING(cstr)
+        }
+    }
+
     impl FieldType {
         pub fn size_of(&self) -> u32 {
             let size = match self {
@@ -191,7 +199,7 @@ macro_rules! event_meta_data_macro {
                     $($vars: $crate::internal::FieldMetaData<array_type!($vars)>),*
                 };
 
-                $(let $vars = $crate::internal::FieldType::from($vars);)*
+                $(let $vars = $crate::internal::FieldType::from($vars.clone());)*
 
                 let event_meta_data = EventMetaData {
                     meta_size: std::mem::size_of::<EventMetaData>() as u16,

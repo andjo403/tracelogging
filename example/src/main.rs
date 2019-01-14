@@ -20,13 +20,14 @@ fn main() {
     tracelogging!("myEvent1", var1, var2);
     tracelogging!("myEvent2");
 
+    let var3 = format!("{}", 3);
     tracelogging_start!("myEvent3", var1, var2);
-    tracelogging_stop!("myEvent3", var1, var2);
+    tracelogging_stop!("myEvent3", var1, var3);
 
     tracelogging_expr!(
         "myEvent4",
         || {
-            tracelogging_tagged!("myEvent5", var1, var2);
+            tracelogging_tagged!("myEvent5", var1, var2, var3);
         },
         var1,
         var2
