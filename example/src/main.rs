@@ -6,15 +6,11 @@
 #[macro_use]
 extern crate tracelogging;
 
-fn main() {
-    let guid = tracelogging::internal::GUID {
-        Data1: 0x3970_f9cf,
-        Data2: 0x2c0c,
-        Data3: 0x4f11,
-        Data4: [0xb1, 0xcc, 0xe3, 0xa1, 0xe9, 0x95, 0x88, 0x33],
-    }; //3970f9cf-2c0c-4f11-b1cc-e3a1e9958833
+use  std::num::ParseIntError;
 
-    tracelogging_register!(guid, SimpleTraceLoggingProvider);
+fn main() -> Result<(), ParseIntError> {
+
+    tracelogging_register!("3970f9cf-2c0c-4f11-b1cc-e3a1e9958833", SimpleTraceLoggingProvider);
     let var1 = 42;
     let var2 = "first";
     tracelogging!("myEvent1", var1, var2);
@@ -49,5 +45,7 @@ fn main() {
         })
     );
 
-    tracelogging::un_register();
+    tracelogging_un_register!();
+
+    Ok(())
 }

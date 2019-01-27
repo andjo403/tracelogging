@@ -10,10 +10,10 @@ pub mod internal {
     pub use winapi::{
         shared::{
             evntprov::{
-                EVENT_DATA_DESCRIPTOR_u, EventActivityIdControl, EventProviderSetTraits,
-                EventRegister, EventSetInformation, EventWrite, EventWriteTransfer,
-                EVENT_ACTIVITY_CTRL_CREATE_ID, EVENT_DATA_DESCRIPTOR,
-                EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA, EVENT_DESCRIPTOR, REGHANDLE,
+                EventActivityIdControl, EventProviderSetTraits, EventRegister, EventSetInformation,
+                EventUnregister, EventWrite, EventWriteTransfer, EVENT_ACTIVITY_CTRL_CREATE_ID,
+                EVENT_DATA_DESCRIPTOR, EVENT_DATA_DESCRIPTOR_TYPE_EVENT_METADATA, EVENT_DESCRIPTOR,
+                REGHANDLE,
             },
             guiddef::GUID,
             winerror::ERROR_SUCCESS,
@@ -189,57 +189,57 @@ macro_rules! replace_expr {
 
 #[macro_export]
 macro_rules! event_meta_data_macro {
-        ( $opcode:tt $funk:ident $event:expr $(,)? $($vars:ident),* $(,)? ) => {
-            if let Some(handle) = unsafe { $crate::internal::HANDLE } {
-                #[repr(C, packed)]
-                struct EventMetaData {
-                    meta_size: u16,
-                    tags: u8,
-                    event_name: array_type!($event),
-                    $($vars: $crate::internal::FieldMetaData<array_type!($vars)>),*
-                };
+    ( $opcode:tt $funk:ident $event:expr $(,)? $($vars:ident),* $(,)? ) => {
+        if let Some(handle) = unsafe { $crate::internal::HANDLE } {
+            #[repr(C, packed)]
+            struct EventMetaData {
+                meta_size: u16,
+                tags: u8,
+                event_name: array_type!($event),
+                $($vars: $crate::internal::FieldMetaData<array_type!($vars)>),*
+            };
 
-                $(let $vars = $crate::internal::FieldType::from($vars.clone());)*
+            $(let $vars = $crate::internal::FieldType::from($vars.clone());)*
 
-                let event_meta_data = EventMetaData {
-                    meta_size: std::mem::size_of::<EventMetaData>() as u16,
-                    tags: 0,
-                    event_name: array_init!($event),
-                    $($vars: $crate::internal::FieldMetaData {
-                        name : $crate::array_init!($vars),
-                        field_type: $vars.as_event_type()
-                    } ),*
-                };
+            let event_meta_data = EventMetaData {
+                meta_size: std::mem::size_of::<EventMetaData>() as u16,
+                tags: 0,
+                event_name: array_init!($event),
+                $($vars: $crate::internal::FieldMetaData {
+                    name : $crate::array_init!($vars),
+                    field_type: $vars.as_event_type()
+                } ),*
+            };
 
-                const NUMBER_OF_DESCRIPTORS : usize = <[()]>::len(&[$($crate::replace_expr!($vars ())),*]) + 1;
+            const NUMBER_OF_DESCRIPTORS : usize = <[()]>::len(&[$($crate::replace_expr!($vars ())),*]) + 1;
 
-                let mut event_data_descriptors: [$crate::internal::EVENT_DATA_DESCRIPTOR; NUMBER_OF_DESCRIPTORS] = [
-                    $crate::internal::EVENT_DATA_DESCRIPTOR {
-                        Ptr: &event_meta_data as *const _ as $crate::internal::ULONGLONG,
-                        Size: std::mem::size_of::<EventMetaData>() as u32,
-                        u: unsafe { std::mem::transmute(1u32) },
-                    },
-                    $($crate::internal::EVENT_DATA_DESCRIPTOR {
-                        Ptr: $vars.as_ptr() as *const _ as $crate::internal::ULONGLONG,
-                        Size: $vars.size_of(),
-                        u: unsafe { std::mem::transmute(0u32) },
-                    }),*
-                ];
+            let mut event_data_descriptors: [$crate::internal::EVENT_DATA_DESCRIPTOR; NUMBER_OF_DESCRIPTORS] = [
+                $crate::internal::EVENT_DATA_DESCRIPTOR {
+                    Ptr: &event_meta_data as *const _ as $crate::internal::ULONGLONG,
+                    Size: std::mem::size_of::<EventMetaData>() as u32,
+                    u: unsafe { std::mem::transmute(1u32) },
+                },
+                $($crate::internal::EVENT_DATA_DESCRIPTOR {
+                    Ptr: $vars.as_ptr() as *const _ as $crate::internal::ULONGLONG,
+                    Size: $vars.size_of(),
+                    u: unsafe { std::mem::transmute(0u32) },
+                }),*
+            ];
 
-                let event_descriptor = $crate::internal::EVENT_DESCRIPTOR {
-                    Id: 0,
-                    Version: 0,
-                    Channel: 0,
-                    Level: 0,
-                    Opcode: $opcode,
-                    Task: 0,
-                    Keyword: 0,
-                };
+            let event_descriptor = $crate::internal::EVENT_DESCRIPTOR {
+                Id: 0,
+                Version: 0,
+                Channel: 0,
+                Level: 0,
+                Opcode: $opcode,
+                Task: 0,
+                Keyword: 0,
+            };
 
-                $funk!(handle event_descriptor event_data_descriptors);
-            }
-        };
-    }
+            $funk!(handle event_descriptor event_data_descriptors);
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! event_tracelogging_start {
@@ -331,11 +331,27 @@ macro_rules! event_tracelogging_tagged {
 
 #[macro_export]
 macro_rules! tracelogging_register {
-    ( $guid:ident , $provider_name:ident ) => {
+    ( $guid:literal , $provider_name:ident ) => {
         let mut handle: $crate::internal::REGHANDLE = 0;
+        // parse guid of the form 3970f9cf-2c0c-4f11-b1cc-e3a1e9958833
+        let guid = $crate::internal::GUID {
+            Data1: u32::from_str_radix(&$guid[0..8], 16)?,
+            Data2: u16::from_str_radix(&$guid[9..13], 16)?,
+            Data3: u16::from_str_radix(&$guid[14..18], 16)?,
+            Data4: [
+                u8::from_str_radix(&$guid[19..21], 16)?,
+                u8::from_str_radix(&$guid[21..23], 16)?,
+                u8::from_str_radix(&$guid[24..26], 16)?,
+                u8::from_str_radix(&$guid[26..28], 16)?,
+                u8::from_str_radix(&$guid[28..30], 16)?,
+                u8::from_str_radix(&$guid[30..32], 16)?,
+                u8::from_str_radix(&$guid[32..34], 16)?,
+                u8::from_str_radix(&$guid[34..36], 16)?,
+            ],
+        };
 
         let mut result = unsafe {
-            $crate::internal::EventRegister(&$guid, None, std::ptr::null_mut(), &mut handle)
+            $crate::internal::EventRegister(&guid, None, std::ptr::null_mut(), &mut handle)
         };
 
         if result == $crate::internal::ERROR_SUCCESS {
@@ -423,14 +439,15 @@ macro_rules! tracelogging_fun {
 }
 
 /// unregister as an event provider
-pub fn un_register() {
-    use winapi::shared::{evntprov, winerror};
-    if let Some(handle) = unsafe { internal::HANDLE } {
-        let result = unsafe { evntprov::EventUnregister(handle) };
+#[macro_export]
+macro_rules! tracelogging_un_register {
+    ( ) => {{
+        if let Some(handle) = unsafe { $crate::internal::HANDLE } {
+            let result = unsafe { $crate::internal::EventUnregister(handle) };
 
-        if result != winerror::ERROR_SUCCESS {
-            println!("un_register failed with '{}'", result);
-            return;
+            if result != $crate::internal::ERROR_SUCCESS {
+                println!("un_register failed with '{}'", result);
+            }
         }
-    }
+    }};
 }
