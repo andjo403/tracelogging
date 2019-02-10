@@ -11,22 +11,22 @@ pub mod internal_macros;
 
 #[macro_export]
 macro_rules! tracelogging {
-    ( $handle:ident, $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!($handle event_tracelogging_tagged $($arg)*)
+    ( $handle:expr, $($arg:tt)* ) => {
+        $crate::event_meta_data_macro!($handle, event_tracelogging_tagged $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! tracelogging_start {
-    ( $handle:ident, $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!($handle event_tracelogging_start $($arg)*)
+    ( $handle:expr, $($arg:tt)* ) => {
+        $crate::event_meta_data_macro!($handle, event_tracelogging_start $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! tracelogging_stop {
-    ( $handle:ident, $related_guid:ident, $($arg:tt)* ) => {{
-        $crate::event_meta_data_macro!($handle event_tracelogging_stop $($arg)*);
+    ( $handle:expr, $related_guid:ident, $($arg:tt)* ) => {{
+        $crate::event_meta_data_macro!($handle, event_tracelogging_stop $($arg)*);
         unsafe {
             $crate::internal::EventActivityIdControl(
                 $crate::internal::EVENT_ACTIVITY_CTRL_SET_ID,
@@ -38,14 +38,14 @@ macro_rules! tracelogging_stop {
 
 #[macro_export]
 macro_rules! tracelogging_tagged {
-    ( $handle:ident, $($arg:tt)* ) => {
-        $crate::event_meta_data_macro!($handle event_tracelogging_tagged $($arg)*)
+    ( $handle:expr, $($arg:tt)* ) => {
+        $crate::event_meta_data_macro!($handle, event_tracelogging_tagged $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! tracelogging_expr {
-    ( $handle:ident, $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
+    ( $handle:expr, $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
         {
             let activity = $crate::tracelogging_start!($handle, $name $($arg),*);
             let result = $exp;
@@ -57,7 +57,7 @@ macro_rules! tracelogging_expr {
 
 #[macro_export]
 macro_rules! tracelogging_fun {
-    ( $handle:ident, $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
+    ( $handle:expr, $name:expr , $exp:expr $(,)? $($arg:ident),* $(,)? ) => {
         {
             let activity = $crate::tracelogging_start!($handle, $name $($arg),*);
             let result = $exp();
@@ -142,7 +142,7 @@ macro_rules! tracelogging_register {
 /// unregister as an event provider
 #[macro_export]
 macro_rules! tracelogging_un_register {
-    ($handle:ident) => {{
+    ($handle:expr) => {{
         let result = unsafe { $crate::internal::EventUnregister($handle) };
 
         assert_eq!(

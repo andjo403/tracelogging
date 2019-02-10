@@ -36,7 +36,7 @@ macro_rules! replace_expr {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! event_meta_data_macro {
-    ( $handle:ident $funk:ident $event:expr $(,)? $($vars:ident),* $(,)? ) => {{
+    ( $handle:expr, $funk:ident $event:expr $(,)? $($vars:ident),* $(,)? ) => {{
             #[repr(C, packed)]
             struct EventMetaData {
                 meta_size: u16,
@@ -72,14 +72,14 @@ macro_rules! event_meta_data_macro {
                 }),*
             ];
 
-            $funk!($handle event_data_descriptors)
+            $funk!($handle, event_data_descriptors)
     }};
 }
 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! event_tracelogging_start {
-    ($handle:ident $event_data_descriptors:ident) => {{
+    ($handle:expr, $event_data_descriptors:ident) => {{
         let event_descriptor = $crate::internal::EVENT_DESCRIPTOR {
             Id: 0,
             Version: 0,
@@ -115,7 +115,7 @@ macro_rules! event_tracelogging_start {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! event_tracelogging_stop {
-    ($handle:ident $event_data_descriptors:ident) => {{
+    ($handle:expr, $event_data_descriptors:ident) => {{
         let event_descriptor = $crate::internal::EVENT_DESCRIPTOR {
             Id: 0,
             Version: 0,
@@ -140,7 +140,7 @@ macro_rules! event_tracelogging_stop {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! event_tracelogging_tagged {
-    ($handle:ident $event_data_descriptors:ident) => {{
+    ($handle:expr, $event_data_descriptors:ident) => {{
         let event_descriptor = $crate::internal::EVENT_DESCRIPTOR {
             Id: 0,
             Version: 0,
