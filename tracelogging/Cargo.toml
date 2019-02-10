@@ -3,6 +3,11 @@ name = "tracelogging"
 version = "0.1.0"
 authors = ["Andreas Jonson <andjo403@users.noreply.github.com>"]
 edition = "2018"
+readme = "../README.md"
+license = "MIT"
+description = "Rust implemenation of parts of the Tracelogging api from Microsofts Event Tracing for Windows (ETW)"
+repository = "https://github.com/andjo403/Tracelogging.git"
+keywords = ["profiler", "trace"]
 
 [dependencies]
 
